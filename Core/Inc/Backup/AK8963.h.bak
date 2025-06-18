@@ -1,0 +1,13 @@
+//
+// Created by Administrator on 25-6-17.
+//
+
+#ifndef AK8963_H
+#define AK8963_H
+
+void AK8963_Init(void);
+uint8_t AK8963_Read_Register(uint8_t reg);
+void AK8963_Write_Register(uint8_t reg, uint8_t data);
+void AK8963_TEST_WHOAMI();
+
+#endif //AK8963_H
