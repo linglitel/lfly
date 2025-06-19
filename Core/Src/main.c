@@ -301,24 +301,26 @@ int main(void)
         gy = gy_dps * (M_PI / 180.0f);
         gz = gz_dps * (M_PI / 180.0f);
 
-        mx = (float)mx_raw * mag_sensitivity_adjust[0] - 10.33f;
+        mx = ((float)mx_raw * mag_sensitivity_adjust[0] - 10.33f);
         my = (float)my_raw * mag_sensitivity_adjust[1] - 236.35f;
         mz = (float)mz_raw * mag_sensitivity_adjust[2] + 147.34f;
 
+        float mx_aligned, my_aligned, mz_aligned;
+
+        mx_aligned = my; // 将对齐后的 mx 赋值为 校准后的 my
+        my_aligned = mx; // 将对齐后的 my 赋值为 校准后的 mx
+        mz_aligned = -mz; // 将对齐后的 mz 赋值为 校准后的 -mz
+
+
         static float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
-        MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, &q0, &q1, &q2, &q3);
-        QuaternionToEuler(q0, q1, q2, q3, &roll, &pitch, &yaw);
+        //MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, &q0, &q1, &q2, &q3);
+        MadgwickUpdate(gx, gy, gz, ax, ay, az, mx_aligned, my_aligned, mz_aligned, &q0, &q1, &q2, &q3);
         uint32_t current_time = HAL_GetTick(); // 获取当前系统运行时间，单位ms
         if (current_time - last_send_time >= 100) // 距离上次发送超过100ms
         {
             last_send_time = current_time;
 
             char buf[100];
-            /*int len = snprintf(buf, sizeof(buf),
-                               "%.2f, %.2f, %.2f\n",
-                               roll * 180.0f / M_PI,
-                               pitch * 180.0f / M_PI,
-                               yaw * 180.0f / M_PI);*/
             int len = snprintf(buf, sizeof(buf),
                                "%.2f, %.2f, %.2f, %.2f\n", q0, q1, q2, q3);
             HAL_UART_Transmit(&huart1, (uint8_t*)buf, len, 100);

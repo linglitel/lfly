@@ -53,7 +53,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/Algorithm/Madgwick/Madgwick.c
         Core/Src/Algorithm/AlgorithmUtils.c
         Core/Src/Tasks/Attitude.c
-        Core/Src/Algorithm/Mahony/Mahony.c
         # Add user sources here
 )
 
