@@ -76,6 +76,8 @@ CRC_HandleTypeDef hcrc;
 
 I2C_HandleTypeDef hi2c1;
 
+SPI_HandleTypeDef hspi1;
+
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim11;
 
@@ -100,6 +102,7 @@ static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_SPI1_Init(void);
 void StartDefaultTask(void* argument);
 
 /* USER CODE BEGIN PFP */
@@ -110,12 +113,11 @@ void StartDefaultTask(void* argument);
 /* USER CODE BEGIN 0 */
 int fputc(int ch, FILE* f)
 {
+    UNUSED(f);
     HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 0xFFFF);
     return ch;
 }
 
-float mag_sensitivity_adjust[3] = {1.0f, 1.0f, 1.0f}; // 你的磁力计校准比例因子，示例1.0f
-float mag_offset[3] = {-10.33f, -236.35f, 147.34f}; // 你的硬铁偏移量
 
 /* USER CODE END 0 */
 
@@ -152,180 +154,55 @@ int main(void)
     MX_USART1_UART_Init();
     MX_TIM11_Init();
     MX_I2C1_Init();
+    MX_SPI1_Init();
     /* USER CODE BEGIN 2 */
-
-
-    uint8_t data;
-
-    // === MPU9250 初始化 ===
-
-
-    // 1. 检查 WHO_AM_I
-    data = 0;
-    HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x75, 1, &data, 1, HAL_MAX_DELAY);
-    if (data != 0x71)
+#define W25Q64_CS_LOW()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET)
+#define W25Q64_CS_HIGH() HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET)
+    /*// 擦除整片 Flash（只用一次的简洁版）
     {
-        Error_Handler();
-    }
+        uint8_t cmd;
 
-    // 2. 退出休眠，设置时钟源为陀螺仪X轴（0x01）
-    data = 0x01;
-    HAL_I2C_Mem_Write(&hi2c1, MPU9250_ADDR, 0x6B, 1, &data, 1, HAL_MAX_DELAY);
+        // 写使能（0x06）
+        cmd = 0x06;
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // CS LOW
+        HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // CS HIGH
+
+        // 发送整片擦除指令（0xC7）
+        cmd = 0xC7;
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+        HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+
+        // 等待擦除完成（读状态寄存器 0x05）
+        cmd = 0x05;
+        uint8_t status = 0x01;
+        while (status & 0x01)
+        {
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+            HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+            HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+            HAL_Delay(10); // 防止轮询太快
+        }
+    }*/
     HAL_Delay(100);
 
-    // 3. 设置加速度计量程 ±2g（0x00）
-    data = 0x00;
-    HAL_I2C_Mem_Write(&hi2c1, MPU9250_ADDR, 0x1C, 1, &data, 1, HAL_MAX_DELAY);
+    uint8_t cmd[4] = {0x90, 0x00, 0x00, 0x00}; // 读取厂商和设备ID
+    uint8_t id[2] = {0};
 
-    // 4. 设置陀螺仪量程 ±250°/s（0x00）
-    HAL_I2C_Mem_Write(&hi2c1, MPU9250_ADDR, 0x1B, 1, &data, 1, HAL_MAX_DELAY);
+    W25Q64_CS_LOW();
+    HAL_SPI_Transmit(&hspi1, cmd, 4, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi1, id, 2, HAL_MAX_DELAY);
+    W25Q64_CS_HIGH();
 
-    // 5. 打开 I2C 主模式 bypass，使主控可直接访问 AK8963
-    data = 0x02; // BIT1 = I2C_BYPASS_EN
-    HAL_I2C_Mem_Write(&hi2c1, MPU9250_ADDR, 0x37, 1, &data, 1, HAL_MAX_DELAY);
-    HAL_Delay(10);
-
-    // 设置加速度计低通滤波器（如44.8Hz截止频率）
-    data = 0x06; // 配置ACCEL_CONFIG2寄存器，DLPF_CFG=0x03
-    HAL_I2C_Mem_Write(&hi2c1, MPU9250_ADDR, 0x1D, 1, &data, 1, HAL_MAX_DELAY);
-
-    // 设置陀螺仪低通滤波器（如41Hz截止频率）
-    data = 0x06; // 配置CONFIG寄存器，DLPF_CFG=0x03
-    HAL_I2C_Mem_Write(&hi2c1, MPU9250_ADDR, 0x1A, 1, &data, 1, HAL_MAX_DELAY);
-
-    // === AK8963 初始化 ===
-
-    uint8_t asa[3];
-
-    // 1. 检查 AK8963 WHO_AM_I
-    data = 0;
-    HAL_I2C_Mem_Read(&hi2c1, AK8963_ADDR, 0x00, 1, &data, 1, HAL_MAX_DELAY);
-    if (data != 0x48)
-    {
-        Error_Handler();
-    }
-    data = 0x06;
-    HAL_I2C_Mem_Write(&hi2c1, AK8963_ADDR, 0x0A, 1, &data, 1, HAL_MAX_DELAY);
-    HAL_Delay(10);
-
-    // 进入 Fuse ROM 读取模式
-    data = 0x0F;
-    HAL_I2C_Mem_Write(&hi2c1, AK8963_ADDR, 0x0A, 1, &data, 1, HAL_MAX_DELAY);
-    HAL_Delay(10);
-
-    // 读取 ASA 寄存器（0x10~0x12）
-    HAL_I2C_Mem_Read(&hi2c1, AK8963_ADDR, 0x10, 1, asa, 3, HAL_MAX_DELAY);
-
-    // 退出 Fuse ROM 模式（进入 Power-down）
-    data = 0x00;
-    HAL_I2C_Mem_Write(&hi2c1, AK8963_ADDR, 0x0A, 1, &data, 1, HAL_MAX_DELAY);
-    HAL_Delay(10);
-
-    data = 0x16; // 0b00010110 -> 16-bit | Continuous Mode 1
-    HAL_I2C_Mem_Write(&hi2c1, AK8963_ADDR, 0x0A, 1, &data, 1, HAL_MAX_DELAY);
-    HAL_Delay(10);
-
-    // 保存校准因子
-    float mag_sensitivity_adjust[3];
-    mag_sensitivity_adjust[0] = ((asa[0] - 128) / 256.0f + 1.0f);
-    mag_sensitivity_adjust[1] = ((asa[1] - 128) / 256.0f + 1.0f);
-    mag_sensitivity_adjust[2] = ((asa[2] - 128) / 256.0f + 1.0f);
-
-    int16_t ax_raw, ay_raw, az_raw;
-    int16_t gx_raw, gy_raw, gz_raw;
-    int16_t mx_raw, my_raw, mz_raw;
-
-    float ax, ay, az;
-    float gx, gy, gz;
-    float mx, my, mz;
-
-    float roll = 0, pitch = 0, yaw = 0;
-    uint32_t last_send_time = 0; // 记录上次发送时间，单位ms
-    while (1)
-    {
-        // 读取加速度计原始值
-        HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x3B, 1, (uint8_t*)&ax_raw, 2, HAL_MAX_DELAY);
-        HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x3D, 1, (uint8_t*)&ay_raw, 2, HAL_MAX_DELAY);
-        HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x3F, 1, (uint8_t*)&az_raw, 2, HAL_MAX_DELAY);
-
-        // 读取陀螺仪原始值
-        HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x43, 1, (uint8_t*)&gx_raw, 2, HAL_MAX_DELAY);
-        HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x45, 1, (uint8_t*)&gy_raw, 2, HAL_MAX_DELAY);
-        HAL_I2C_Mem_Read(&hi2c1, MPU9250_ADDR, 0x47, 1, (uint8_t*)&gz_raw, 2, HAL_MAX_DELAY);
-
-        uint8_t mag_status;
-
-        // 1. 检查 ST1 寄存器 (0x02)，看数据是否就绪 (DRDY bit is 1)
-        HAL_I2C_Mem_Read(&hi2c1, AK8963_ADDR, 0x02, 1, &mag_status, 1, HAL_MAX_DELAY);
-        uint8_t mag_buf[7];
-        // 2. 如果数据就绪 (mag_status 的第0位为1)
-        if (mag_status & 0x01)
-        {
-            // 高效读取方法：一次性读取从 HXL (0x03) 到 ST2 (0x09) 的所有7个字节
-            // 这样既拿到了数据，也完成了读取 ST2 的操作
-
-            HAL_I2C_Mem_Read(&hi2c1, AK8963_ADDR, 0x03, 1, mag_buf, 7, HAL_MAX_DELAY);
-
-            // mag_buf[6] 现在是 ST2 寄存器的值，可以用来检查数据是否溢出
-            // 如果 ST2 的 HOFL 位 (bit3) 为0，则数据有效
-            if (!(mag_buf[6] & 0x08))
-            {
-                // AK8963 是小端序 (Little Endian)，低字节在前
-                mx_raw = (int16_t)(mag_buf[1] << 8 | mag_buf[0]);
-                my_raw = (int16_t)(mag_buf[3] << 8 | mag_buf[2]);
-                mz_raw = (int16_t)(mag_buf[5] << 8 | mag_buf[4]);
-            }
-            // 读取 mag_buf[6] 的这个动作本身就已经完成了“解锁”传感器的任务
-        }
+    uint8_t manufacturer = id[0];
+    uint8_t device = id[1];
+    char buf[100];
+    int len = snprintf(buf, sizeof(buf), "Manufacturer: 0x%02X, Device: 0x%02X\n", manufacturer, device);
+    HAL_UART_Transmit(&huart1, (uint8_t*)buf, len, 100);
 
 
-        // 原始数据是高低字节连续，需要根据字节顺序转换（假设小端）
-        ax_raw = (int16_t)((((uint8_t*)&ax_raw)[0] << 8) | ((uint8_t*)&ax_raw)[1]);
-        ay_raw = (int16_t)((((uint8_t*)&ay_raw)[0] << 8) | ((uint8_t*)&ay_raw)[1]);
-        az_raw = (int16_t)((((uint8_t*)&az_raw)[0] << 8) | ((uint8_t*)&az_raw)[1]);
-
-        gx_raw = (int16_t)((((uint8_t*)&gx_raw)[0] << 8) | ((uint8_t*)&gx_raw)[1]);
-        gy_raw = (int16_t)((((uint8_t*)&gy_raw)[0] << 8) | ((uint8_t*)&gy_raw)[1]);
-        gz_raw = (int16_t)((((uint8_t*)&gz_raw)[0] << 8) | ((uint8_t*)&gz_raw)[1]);
-
-        // 单位换算
-        ax = (float)ax_raw / 16384.0f; // ±2g量程
-        ay = (float)ay_raw / 16384.0f;
-        az = (float)az_raw / 16384.0f;
-
-        float gx_dps = (float)gx_raw / 131.0f; // ±250°/s量程
-        float gy_dps = (float)gy_raw / 131.0f;
-        float gz_dps = (float)gz_raw / 131.0f;
-
-        gx = gx_dps * (M_PI / 180.0f);
-        gy = gy_dps * (M_PI / 180.0f);
-        gz = gz_dps * (M_PI / 180.0f);
-
-        mx = ((float)mx_raw * mag_sensitivity_adjust[0] - 10.33f);
-        my = (float)my_raw * mag_sensitivity_adjust[1] - 236.35f;
-        mz = (float)mz_raw * mag_sensitivity_adjust[2] + 147.34f;
-
-        float mx_aligned, my_aligned, mz_aligned;
-
-        mx_aligned = my; // 将对齐后的 mx 赋值为 校准后的 my
-        my_aligned = mx; // 将对齐后的 my 赋值为 校准后的 mx
-        mz_aligned = -mz; // 将对齐后的 mz 赋值为 校准后的 -mz
-
-
-        static float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
-        //MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, &q0, &q1, &q2, &q3);
-        MadgwickUpdate(gx, gy, gz, ax, ay, az, mx_aligned, my_aligned, mz_aligned, &q0, &q1, &q2, &q3);
-        uint32_t current_time = HAL_GetTick(); // 获取当前系统运行时间，单位ms
-        if (current_time - last_send_time >= 100) // 距离上次发送超过100ms
-        {
-            last_send_time = current_time;
-
-            char buf[100];
-            int len = snprintf(buf, sizeof(buf),
-                               "%.2f, %.2f, %.2f, %.2f\n", q0, q1, q2, q3);
-            HAL_UART_Transmit(&huart1, (uint8_t*)buf, len, 100);
-        }
-    }
     for (;;);
     /* USER CODE END 2 */
 
@@ -486,6 +363,42 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+    /* USER CODE BEGIN SPI1_Init 0 */
+
+    /* USER CODE END SPI1_Init 0 */
+
+    /* USER CODE BEGIN SPI1_Init 1 */
+
+    /* USER CODE END SPI1_Init 1 */
+    /* SPI1 parameter configuration*/
+    hspi1.Instance = SPI1;
+    hspi1.Init.Mode = SPI_MODE_MASTER;
+    hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+    hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+    hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+    hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+    hspi1.Init.NSS = SPI_NSS_SOFT;
+    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+    hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+    hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+    hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+    hspi1.Init.CRCPolynomial = 10;
+    if (HAL_SPI_Init(&hspi1) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN SPI1_Init 2 */
+
+    /* USER CODE END SPI1_Init 2 */
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -634,17 +547,17 @@ static void MX_GPIO_Init(void)
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
     /*Configure GPIO pin Output Level */
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
 
-    /*Configure GPIO pin : LED_Pin */
-    GPIO_InitStruct.Pin = LED_Pin;
+    /*Configure GPIO pin : PC13 */
+    GPIO_InitStruct.Pin = GPIO_PIN_13;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     /*Configure GPIO pin : PA4 */
     GPIO_InitStruct.Pin = GPIO_PIN_4;
@@ -676,7 +589,6 @@ void StartDefaultTask(void* argument)
     /* Infinite loop */
     for (;;)
     {
-        HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
         osDelay(1);
     }
     /* USER CODE END 5 */

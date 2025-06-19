@@ -52,7 +52,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/Sensor/MPU9250/AK8963Utils.c
         Core/Src/Algorithm/Madgwick/Madgwick.c
         Core/Src/Algorithm/AlgorithmUtils.c
-        Core/Src/Tasks/Attitude.c
+        Core/Src/Tasks/AttitudeTask.c
+        Core/Src/Flash/W25Q64/W25Q64Utils.c
         # Add user sources here
 )
 

@@ -8,35 +8,16 @@
 #define PI 3.141592
 #define R2D 180.00f/3.141592f
 
-typedef struct
-{
-    float q0, q1, q2, q3; // 四元数
-    float beta; // 算法增益
-    float sampleFreq; // 采样频率
-} MadgwickFilter;
+#define MPU9250_ADDR  (0x68 << 1)  // 7-bit 地址左移一位
+#define AK8963_ADDR   (0x0C << 1)  // AK8963 地址
+
+extern float mag_sensitivity_adjust[3];
+extern float mag_offset[3]; //todo need more precise
 
 void MadgwickUpdate(
     float gx, float gy, float gz,
     float ax, float ay, float az,
     float mx, float my, float mz,
     float* q0, float* q1, float* q2, float* q3);
-void MadgwickAHRSupdateIMU(MadgwickFilter* f,
-                           float gx, float gy, float gz,
-                           float ax, float ay, float az);
-void computeAngles(float q0, float q1, float q2, float q3, float* roll, float* pitch, float* yaw);
 
-void EKF_Attitude(
-    float ax, float ay, float az,
-    float gx, float gy, float gz,
-    float mx, float my, float mz,
-    float* roll, float* pitch, float* yaw
-);
-
-void IMUonly_EKF(
-    float ax, float ay, float az,
-    float gx, float gy, float gz,
-    float mx, float my, float mz,
-    float* roll, float* pitch, float* yaw
-);
-void QuaternionToEuler(float q0, float q1, float q2, float q3, float* roll, float* pitch, float* yaw);
 #endif //MADGWICK_H

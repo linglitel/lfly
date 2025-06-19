@@ -8,6 +8,9 @@
 float beta = 0.01f;
 float sampleFreq = 1000;
 
+float mag_sensitivity_adjust[3] = {1.0f, 1.0f, 1.0f}; // 你的磁力计校准比例因子，示例1.0f
+float mag_offset[3] = {-10.33f, -236.35f, 147.34f}; // 你的硬铁偏移量
+
 void MadgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz,
                     float* q0, float* q1, float* q2, float* q3)
 {
