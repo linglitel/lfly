@@ -45,7 +45,8 @@ typedef struct
     char message[56]; // 56 bytes，日志内容
 } LogEntry;
 
-bool LOG_Read(uint32_t index, LogEntry* log_entry);
+uint8_t LOG_Read(uint32_t index, LogEntry* log_entry);
+void LOG_Write(LogEntry* log_entry);
 void LOG_Traverse(void (*process)(const LogEntry*)); //todo need modify
 
 #endif //LOGUTILS_H

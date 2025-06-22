@@ -54,6 +54,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/Algorithm/AlgorithmUtils.c
         Core/Src/Tasks/AttitudeTask.c
         Core/Src/Flash/W25Q64/W25Q64Utils.c
+        Core/Src/Tasks/PidTask.c
+        Core/Src/Tasks/ControlTask.c
+        Core/Src/Log/LogUtils.c
         # Add user sources here
 )
 

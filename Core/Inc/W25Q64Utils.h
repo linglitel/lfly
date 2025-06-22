@@ -39,6 +39,6 @@ uint32_t W25Q64_Find_Next_Log_Address(void);
 
 void W25Q64_Write_Log(uint32_t addr, uint8_t* data, uint16_t len);
 bool W25Q64_Is_Sector_Erased(uint32_t sector_addr);
-
+void W25Q64_Erase_All();
 
 #endif //W25Q64UTILS_H

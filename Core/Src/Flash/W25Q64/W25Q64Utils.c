@@ -11,6 +11,8 @@
 #include "LogUtils.h"
 #include "main.h"
 
+extern UART_HandleTypeDef huart1;
+
 void W25Q64_Init()
 {
     uint32_t id = W25Q64_Read_ID();
@@ -27,6 +29,12 @@ void W25Q64_Init()
     }
     else
     {
+        if (W25Q64_Find_Next_Log_Address() == 0xFFFFFFFF)
+        {
+            const char buf[] = "ERROR: Storage space is full\n";
+            HAL_UART_Transmit(&huart1, buf, strlen(buf), HAL_MAX_DELAY);
+        }
+        //todo need more handler
     }
 }
 
@@ -68,7 +76,9 @@ static void W25Q64_Wait_Busy(void)
 {
     while (W25Q64_Read_Status() & 0x01)
     {
-        osDelay(1); // FreeRTOS 非阻塞延时，1个Tick
+        //osDelay(1); // FreeRTOS 非阻塞延时，1个Tick
+        //mast use it  in tasks
+        HAL_Delay(1);
     }
 }
 
@@ -182,4 +192,35 @@ void W25Q64_Write_Log(uint32_t addr, uint8_t* data, uint16_t len)
 
     // 直接写数据
     W25Q64_Write_Data(addr, data, len);
+}
+
+
+//no use it , but i need it
+void W25Q64_Erase_All()
+{
+    uint8_t cmd;
+
+    // 写使能（0x06）
+    cmd = 0x06;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // CS LOW
+    HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // CS HIGH
+
+    // 发送整片擦除指令（0xC7）
+    cmd = 0xC7;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+
+    // 等待擦除完成（读状态寄存器 0x05）
+    cmd = 0x05;
+    uint8_t status = 0x01;
+    while (status & 0x01)
+    {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+        HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+        HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+        HAL_Delay(10); // 防止轮询太快
+    }
 }

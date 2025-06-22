@@ -4,6 +4,8 @@
 
 #include "LogUtils.h"
 
+#include <string.h>
+
 static uint32_t s_log_start_addr = LOG_START_ADDR;
 static uint32_t s_log_total_size = LOG_TOTAL_SIZE;
 static uint32_t s_log_entry_size = LOG_ENTRY_SIZE;
@@ -27,7 +29,7 @@ void LOG_Write(LogEntry* log_entry)
     W25Q64_Write_Data(addr, (uint8_t*)log_entry, LOG_ENTRY_SIZE);
 }
 
-bool LOG_Read(uint32_t index, LogEntry* log_entry)
+uint8_t LOG_Read(uint32_t index, LogEntry* log_entry)
 {
     if (!log_entry || index >= s_log_max_entries)
         return false;
@@ -39,6 +41,18 @@ bool LOG_Read(uint32_t index, LogEntry* log_entry)
         return false; // 无有效日志
 
     return true;
+}
+
+void LOG_Delete(uint32_t index)
+{
+    if (index >= s_log_max_entries)
+        return;
+
+    uint32_t addr = s_log_start_addr + index * s_log_entry_size;
+    LogEntry empty_entry;
+    memset(&empty_entry, 0xFF, sizeof(LogEntry)); // 填满0xFF，模拟擦除状态
+
+    W25Q64_Write_Data(addr, (uint8_t*)&empty_entry, sizeof(LogEntry));
 }
 
 void LOG_Traverse(void (*process)(const LogEntry*))

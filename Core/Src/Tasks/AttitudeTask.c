@@ -74,7 +74,7 @@ void AttitudeTask(void* argument)
 
     // 单位换算
     float ax = (float)ax_raw / 16384.0f; // ±2g量程
-    float ay = (float)ay_raw / 16384.0f;
+    float ay = (float)ay_raw / 16384.0f; //g 单位
     float az = (float)az_raw / 16384.0f;
 
     float gx_dps = (float)gx_raw / 131.0f; // ±250°/s量程
@@ -83,13 +83,14 @@ void AttitudeTask(void* argument)
 
     gx = M_PI / 180.0f * gx_dps;
     gy = M_PI / 180.0f * gy_dps;
-    gz = M_PI / 180.0f * gz_dps;
+    gz = M_PI / 180.0f * gz_dps; //rad/s
 
     mx = (float)my_raw * mag_sensitivity_adjust[1] - 236.35f; // 将对齐后的 mx 赋值为 校准后的 my
     my = (float)mx_raw * mag_sensitivity_adjust[0] - 10.33f; // 将对齐后的 my 赋值为 校准后的 mx
     mz = -((float)mz_raw * mag_sensitivity_adjust[2] + 147.34f); // 将对齐后的 mz 赋值为 校准后的 -mz
 
+
     MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, &q0, &q1, &q2, &q3);
     //vTaskDelayUntil(&lastWakeTime, period);
-    osDelay(pdMS_TO_TICKS(10));
+    //osDelay(pdMS_TO_TICKS(10));
 }

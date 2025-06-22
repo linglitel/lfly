@@ -50,6 +50,8 @@
 #include <stdbool.h>
 
 #include "AttitudeTask.h"
+#include "ControlTask.h"
+#include "LogUtils.h"
 #include "Madgwick.h"
 #include "SensorUtils.h"
 #include "stdio.h"
@@ -77,6 +79,7 @@ CRC_HandleTypeDef hcrc;
 I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim11;
@@ -103,6 +106,7 @@ static void MX_USART1_UART_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_SPI2_Init(void);
 void StartDefaultTask(void* argument);
 
 /* USER CODE BEGIN PFP */
@@ -155,55 +159,14 @@ int main(void)
     MX_TIM11_Init();
     MX_I2C1_Init();
     MX_SPI1_Init();
+    MX_SPI2_Init();
     /* USER CODE BEGIN 2 */
-#define W25Q64_CS_LOW()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET)
-#define W25Q64_CS_HIGH() HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET)
-    /*// 擦除整片 Flash（只用一次的简洁版）
+    char buf[50];
+    TEST_TEMP_WILL_DELETE();
+    for (;;)
     {
-        uint8_t cmd;
-
-        // 写使能（0x06）
-        cmd = 0x06;
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // CS LOW
-        HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // CS HIGH
-
-        // 发送整片擦除指令（0xC7）
-        cmd = 0xC7;
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-        HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-
-        // 等待擦除完成（读状态寄存器 0x05）
-        cmd = 0x05;
-        uint8_t status = 0x01;
-        while (status & 0x01)
-        {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-            HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
-            HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-            HAL_Delay(10); // 防止轮询太快
-        }
-    }*/
-    HAL_Delay(100);
-
-    uint8_t cmd[4] = {0x90, 0x00, 0x00, 0x00}; // 读取厂商和设备ID
-    uint8_t id[2] = {0};
-
-    W25Q64_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, cmd, 4, HAL_MAX_DELAY);
-    HAL_SPI_Receive(&hspi1, id, 2, HAL_MAX_DELAY);
-    W25Q64_CS_HIGH();
-
-    uint8_t manufacturer = id[0];
-    uint8_t device = id[1];
-    char buf[100];
-    int len = snprintf(buf, sizeof(buf), "Manufacturer: 0x%02X, Device: 0x%02X\n", manufacturer, device);
-    HAL_UART_Transmit(&huart1, (uint8_t*)buf, len, 100);
-
-
-    for (;;);
+        AttitudeTask(NULL);
+    }
     /* USER CODE END 2 */
 
     /* Init scheduler */
@@ -399,6 +362,42 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+    /* USER CODE BEGIN SPI2_Init 0 */
+
+    /* USER CODE END SPI2_Init 0 */
+
+    /* USER CODE BEGIN SPI2_Init 1 */
+
+    /* USER CODE END SPI2_Init 1 */
+    /* SPI2 parameter configuration*/
+    hspi2.Instance = SPI2;
+    hspi2.Init.Mode = SPI_MODE_MASTER;
+    hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+    hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+    hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+    hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+    hspi2.Init.NSS = SPI_NSS_SOFT;
+    hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+    hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+    hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+    hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+    hspi2.Init.CRCPolynomial = 10;
+    if (HAL_SPI_Init(&hspi2) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN SPI2_Init 2 */
+
+    /* USER CODE END SPI2_Init 2 */
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -550,7 +549,10 @@ static void MX_GPIO_Init(void)
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1 | GPIO_PIN_4, GPIO_PIN_RESET);
+
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 
     /*Configure GPIO pin : PC13 */
     GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -559,12 +561,19 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    /*Configure GPIO pin : PA4 */
-    GPIO_InitStruct.Pin = GPIO_PIN_4;
+    /*Configure GPIO pins : PA1 PA4 */
+    GPIO_InitStruct.Pin = GPIO_PIN_1 | GPIO_PIN_4;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /*Configure GPIO pin : PB1 */
+    GPIO_InitStruct.Pin = GPIO_PIN_1;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     /* USER CODE BEGIN MX_GPIO_Init_2 */
 
