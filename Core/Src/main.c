@@ -25,11 +25,8 @@
 
 #include <stdio.h>
 #include <string.h>
-
-#include "AK8963Utils.h"
-#include "MPU9250Utils.h"
-#include "Madgwick.h"
-
+#include "AttitudeTask.h"
+#include "LogUtils.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,12 +46,13 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "AttitudeTask.h"
-#include "ControlTask.h"
-#include "LogUtils.h"
-#include "Madgwick.h"
-#include "SensorUtils.h"
-#include "stdio.h"
+#include "ESCControlTask.h"
+#include "JY901PUtils.h"
+#include "PidTask.h"
+#include "RemoteControlTask.h"
+#include "wit_c_sdk.h"
+
+
 #define ITM_Port8(n)    (*((volatile unsigned char *)(0xE0000000+4*n)))
 #define ITM_Port16(n)   (*((volatile unsigned short*)(0xE0000000+4*n)))
 #define ITM_Port32(n)   (*((volatile unsigned long *)(0xE0000000+4*n)))
@@ -79,12 +77,19 @@ CRC_HandleTypeDef hcrc;
 I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
-SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart6;
+
+osThreadId_t imuTaskHandle;
+osThreadId_t pidTaskHandle;
+osThreadId_t escTaskHandle;
+osThreadId_t rcTaskHandle;
+
+uint8_t usart6_rx_byte = 0;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -94,7 +99,16 @@ const osThreadAttr_t defaultTask_attributes = {
     .priority = (osPriority_t)osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-osThreadId_t imuTaskHandle;
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart)
+{
+    if (huart->Instance == USART6)
+    {
+        WitSerialDataIn(usart6_rx_byte); // 把接收到的数据交给 Wit 解析器
+        HAL_UART_Receive_IT(&huart6, &usart6_rx_byte, 1); // 继续接收下一个字节
+    }
+}
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,7 +120,7 @@ static void MX_USART1_UART_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_SPI2_Init(void);
+static void MX_USART6_UART_Init(void);
 void StartDefaultTask(void* argument);
 
 /* USER CODE BEGIN PFP */
@@ -159,14 +173,15 @@ int main(void)
     MX_TIM11_Init();
     MX_I2C1_Init();
     MX_SPI1_Init();
-    MX_SPI2_Init();
+    MX_USART6_UART_Init();
     /* USER CODE BEGIN 2 */
-    char buf[50];
-    TEST_TEMP_WILL_DELETE();
-    for (;;)
-    {
-        AttitudeTask(NULL);
-    }
+    HAL_UART_Receive_IT(&huart6, &usart6_rx_byte, 1);
+    HAL_Delay(1000);
+    W25Q64_Init();
+    HAL_Delay(5000);
+    ESC_Init();
+    JY901P_Init();
+
     /* USER CODE END 2 */
 
     /* Init scheduler */
@@ -197,10 +212,30 @@ int main(void)
     const osThreadAttr_t imuTask_attributes = {
         .name = "IMU_Task",
         .stack_size = 256 * 4, // 256字，4字节/字
+        .priority = (osPriority_t)osPriorityHigh,
+    };
+    imuTaskHandle = osThreadNew(AttitudeTask, NULL, &imuTask_attributes);
+
+    const osThreadAttr_t pidTask_attributes = {
+        .name = "PID_Task",
+        .stack_size = 256 * 16,
+        .priority = (osPriority_t)osPriorityAboveNormal,
+    };
+    pidTaskHandle = osThreadNew(PidTask, NULL, &pidTask_attributes);
+
+    const osThreadAttr_t escTask_attributes = {
+        .name = "ESC_Task",
+        .stack_size = 256 * 4,
         .priority = (osPriority_t)osPriorityNormal,
     };
+    escTaskHandle = osThreadNew(ESCControlTask,NULL, &escTask_attributes);
 
-    imuTaskHandle = osThreadNew(AttitudeTask, NULL, &imuTask_attributes);
+    const osThreadAttr_t rcTask_attributes = {
+        .name = "RC_Task",
+        .stack_size = 256 * 4,
+        .priority = (osPriority_t)osPriorityAboveNormal
+    };
+    rcTaskHandle = osThreadNew(RemoteControlTask, NULL, &rcTask_attributes);
     /* USER CODE END RTOS_THREADS */
 
     /* USER CODE BEGIN RTOS_EVENTS */
@@ -362,42 +397,6 @@ static void MX_SPI1_Init(void)
 }
 
 /**
-  * @brief SPI2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI2_Init(void)
-{
-    /* USER CODE BEGIN SPI2_Init 0 */
-
-    /* USER CODE END SPI2_Init 0 */
-
-    /* USER CODE BEGIN SPI2_Init 1 */
-
-    /* USER CODE END SPI2_Init 1 */
-    /* SPI2 parameter configuration*/
-    hspi2.Instance = SPI2;
-    hspi2.Init.Mode = SPI_MODE_MASTER;
-    hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-    hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-    hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-    hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-    hspi2.Init.NSS = SPI_NSS_SOFT;
-    hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-    hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
-    hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-    hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-    hspi2.Init.CRCPolynomial = 10;
-    if (HAL_SPI_Init(&hspi2) != HAL_OK)
-    {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN SPI2_Init 2 */
-
-    /* USER CODE END SPI2_Init 2 */
-}
-
-/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -525,6 +524,37 @@ static void MX_USART1_UART_Init(void)
     /* USER CODE BEGIN USART1_Init 2 */
 
     /* USER CODE END USART1_Init 2 */
+}
+
+/**
+  * @brief USART6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART6_UART_Init(void)
+{
+    /* USER CODE BEGIN USART6_Init 0 */
+
+    /* USER CODE END USART6_Init 0 */
+
+    /* USER CODE BEGIN USART6_Init 1 */
+
+    /* USER CODE END USART6_Init 1 */
+    huart6.Instance = USART6;
+    huart6.Init.BaudRate = 230400;
+    huart6.Init.WordLength = UART_WORDLENGTH_8B;
+    huart6.Init.StopBits = UART_STOPBITS_1;
+    huart6.Init.Parity = UART_PARITY_NONE;
+    huart6.Init.Mode = UART_MODE_TX_RX;
+    huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+    if (HAL_UART_Init(&huart6) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN USART6_Init 2 */
+
+    /* USER CODE END USART6_Init 2 */
 }
 
 /**

@@ -5,15 +5,13 @@
 #include "AlgorithmUtils.h"
 
 
-float beta = 0.01f;
-float sampleFreq = 1000;
-
+float beta = 0.1f;
 float mag_sensitivity_adjust[3] = {1.0f, 1.0f, 1.0f}; // 你的磁力计校准比例因子，示例1.0f
 float mag_offset[3] = {-10.33f, -236.35f, 147.34f}; // 你的硬铁偏移量
 float roll, pitch, yaw;
 
 void MadgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz,
-                    float* q0, float* q1, float* q2, float* q3)
+                    float* q0, float* q1, float* q2, float* q3, float dt)
 {
     float recipNorm;
     float qDot1, qDot2, qDot3, qDot4;
@@ -135,10 +133,10 @@ void MadgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, 
     }
 
     // 对四元数变化率进行积分，得到四元数
-    *q0 += qDot1 * (1.0f / sampleFreq);
-    *q1 += qDot2 * (1.0f / sampleFreq);
-    *q2 += qDot3 * (1.0f / sampleFreq);
-    *q3 += qDot4 * (1.0f / sampleFreq);
+    *q0 += qDot1 * dt;
+    *q1 += qDot2 * dt;
+    *q2 += qDot3 * dt;
+    *q3 += qDot4 * dt;
 
     // 归一化四元数
     recipNorm = invSqrt(*q0 * *q0 + *q1 * *q1 + *q2 * *q2 + *q3 * *q3);
@@ -147,6 +145,83 @@ void MadgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, 
     *q2 *= recipNorm;
     *q3 *= recipNorm;
 }
+
+
+void MadgwickAHRSupdateIMU(float gx, float gy, float gz,
+                           float ax, float ay, float az,
+                           float* q0, float* q1, float* q2, float* q3, float dt)
+{
+    float recipNorm;
+    float s0, s1, s2, s3;
+    float qDot1, qDot2, qDot3, qDot4;
+    float _2q0, _2q1, _2q2, _2q3, _4q0, _4q1, _4q2, _8q1, _8q2;
+    float q0q0, q1q1, q2q2, q3q3;
+
+    // 本地拷贝四元数
+    float q0c = *q0, q1c = *q1, q2c = *q2, q3c = *q3;
+
+    // 陀螺积分项
+    qDot1 = 0.5f * (-q1c * gx - q2c * gy - q3c * gz);
+    qDot2 = 0.5f * (q0c * gx + q2c * gz - q3c * gy);
+    qDot3 = 0.5f * (q0c * gy - q1c * gz + q3c * gx);
+    qDot4 = 0.5f * (q0c * gz + q1c * gy - q2c * gx);
+
+    // 加速度不是零才能用来校正
+    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)))
+    {
+        // 单位化加速度
+        recipNorm = invSqrt(ax * ax + ay * ay + az * az);
+        ax *= recipNorm;
+        ay *= recipNorm;
+        az *= recipNorm;
+
+        // 辅助变量
+        _2q0 = 2.0f * q0c;
+        _2q1 = 2.0f * q1c;
+        _2q2 = 2.0f * q2c;
+        _2q3 = 2.0f * q3c;
+        _4q0 = 4.0f * q0c;
+        _4q1 = 4.0f * q1c;
+        _4q2 = 4.0f * q2c;
+        _8q1 = 8.0f * q1c;
+        _8q2 = 8.0f * q2c;
+        q0q0 = q0c * q0c;
+        q1q1 = q1c * q1c;
+        q2q2 = q2c * q2c;
+        q3q3 = q3c * q3c;
+
+        // 梯度下降法校正
+        s0 = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
+        s1 = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * q1c - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
+        s2 = 4.0f * q0q0 * q2c + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
+        s3 = 4.0f * q1q1 * q3c - _2q1 * ax + 4.0f * q2q2 * q3c - _2q2 * ay;
+        recipNorm = invSqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
+        s0 *= recipNorm;
+        s1 *= recipNorm;
+        s2 *= recipNorm;
+        s3 *= recipNorm;
+
+        // 反馈修正
+        qDot1 -= beta * s0;
+        qDot2 -= beta * s1;
+        qDot3 -= beta * s2;
+        qDot4 -= beta * s3;
+    }
+
+    // 积分，更新四元数
+    q0c += qDot1 * dt;
+    q1c += qDot2 * dt;
+    q2c += qDot3 * dt;
+    q3c += qDot4 * dt;
+
+    // 单位化四元数
+    recipNorm = invSqrt(q0c * q0c + q1c * q1c + q2c * q2c + q3c * q3c);
+    *q0 = q0c * recipNorm;
+    *q1 = q1c * recipNorm;
+    *q2 = q2c * recipNorm;
+    *q3 = q3c * recipNorm;
+}
+
 
 void get_eulerAngle(float q0, float q1, float q2, float q3)
 {

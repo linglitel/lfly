@@ -19,7 +19,11 @@ void MadgwickUpdate(
     float gx, float gy, float gz,
     float ax, float ay, float az,
     float mx, float my, float mz,
-    float* q0, float* q1, float* q2, float* q3);
+    float* q0, float* q1, float* q2, float* q3, float dt);
+
+void MadgwickAHRSupdateIMU(float gx, float gy, float gz,
+                           float ax, float ay, float az,
+                           float* q0, float* q1, float* q2, float* q3, float dt);
 
 void get_eulerAngle(float q0, float q1, float q2, float q3);
 

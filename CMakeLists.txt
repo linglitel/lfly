@@ -55,8 +55,12 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/Tasks/AttitudeTask.c
         Core/Src/Flash/W25Q64/W25Q64Utils.c
         Core/Src/Tasks/PidTask.c
-        Core/Src/Tasks/ControlTask.c
+        Core/Src/Tasks/ESCControlTask.c
         Core/Src/Log/LogUtils.c
+        Core/Src/Algorithm/Mahony/Mahony.c
+        Core/Src/Sensor/JY901P/SDK/wit_c_sdk.c
+        Core/Src/Sensor/JY901P/JY901PUtils.c
+        Core/Src/Tasks/RemoteControlTask.c
         # Add user sources here
 )
 
