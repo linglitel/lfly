@@ -6,7 +6,6 @@
 #define LOGUTILS_H
 
 #include <stdint.h>
-#include "W25Q64Utils.h"
 
 #define LOG_ENTRY_SIZE     64               // 每条日志占用64字节
 #define LOG_START_ADDR     0x000000         // 日志区起始地址

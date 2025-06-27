@@ -3,7 +3,6 @@
 static SerialWrite p_WitSerialWriteFunc = NULL;
 static WitI2cWrite p_WitI2cWriteFunc = NULL;
 static WitI2cRead p_WitI2cReadFunc = NULL;
-static CanWrite p_WitCanWriteFunc = NULL;
 static RegUpdateCb p_WitRegUpdateCbFunc = NULL;
 static DelaymsCb p_WitDelaymsFunc = NULL;
 
@@ -217,8 +216,6 @@ void WitSerialDataIn(uint8_t ucData)
             s_uiWitDataCnt = 0;
         }
         break;
-    case WIT_PROTOCOL_905x_CAN:
-    case WIT_PROTOCOL_CAN:
     case WIT_PROTOCOL_I2C:
         s_uiWitDataCnt = 0;
         break;
@@ -277,16 +274,6 @@ int32_t WitWriteReg(uint32_t uiReg, uint16_t usData)
         ucBuff[7] = usCRC & 0xff;
         p_WitSerialWriteFunc(ucBuff, 8);
         break;
-    case WIT_PROTOCOL_905x_CAN:
-    case WIT_PROTOCOL_CAN:
-        if (p_WitCanWriteFunc == NULL)return WIT_HAL_EMPTY;
-        ucBuff[0] = 0xFF;
-        ucBuff[1] = 0xAA;
-        ucBuff[2] = uiReg & 0xFF;
-        ucBuff[3] = usData & 0xff;
-        ucBuff[4] = usData >> 8;
-        p_WitCanWriteFunc(s_ucAddr, ucBuff, 5);
-        break;
     case WIT_PROTOCOL_I2C:
         if (p_WitI2cWriteFunc == NULL)return WIT_HAL_EMPTY;
         ucBuff[0] = usData & 0xff;
@@ -337,17 +324,7 @@ int32_t WitReadReg(uint32_t uiReg, uint32_t uiReadNum)
         ucBuff[7] = usTemp & 0xff;
         p_WitSerialWriteFunc(ucBuff, 8);
         break;
-    case WIT_PROTOCOL_905x_CAN:
-    case WIT_PROTOCOL_CAN:
-        if (uiReadNum > 3)return WIT_HAL_INVAL;
-        if (p_WitCanWriteFunc == NULL)return WIT_HAL_EMPTY;
-        ucBuff[0] = 0xFF;
-        ucBuff[1] = 0xAA;
-        ucBuff[2] = 0x27;
-        ucBuff[3] = uiReg & 0xff;
-        ucBuff[4] = uiReg >> 8;
-        p_WitCanWriteFunc(s_ucAddr, ucBuff, 5);
-        break;
+
     case WIT_PROTOCOL_I2C:
         if (p_WitI2cReadFunc == NULL)return WIT_HAL_EMPTY;
         usTemp = uiReadNum << 1;
@@ -373,7 +350,6 @@ int32_t WitReadReg(uint32_t uiReg, uint32_t uiReadNum)
 
 int32_t WitInit(uint32_t uiProtocol, uint8_t ucAddr)
 {
-    if (uiProtocol > WIT_PROTOCOL_905x_CAN)return WIT_HAL_INVAL;
     s_uiProtoclo = uiProtocol;
     s_ucAddr = ucAddr;
     s_uiWitDataCnt = 0;
@@ -386,7 +362,6 @@ void WitDeInit(void)
     p_WitSerialWriteFunc = NULL;
     p_WitI2cWriteFunc = NULL;
     p_WitI2cReadFunc = NULL;
-    p_WitCanWriteFunc = NULL;
     p_WitRegUpdateCbFunc = NULL;
     p_WitDelaymsFunc = NULL;
     s_ucAddr = 0xff;

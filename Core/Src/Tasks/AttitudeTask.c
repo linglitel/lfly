@@ -4,7 +4,6 @@
 
 #include <math.h>
 
-#include "AK8963Utils.h"
 #include "cmsis_os2.h"
 #include "FreeRTOS.h"
 #include "PidTask.h"
@@ -29,9 +28,9 @@ void AttitudeTask(void* argument)
 
         WitReadReg(0x37, 3);
         osDelay(2);
-        ctrl.currentRate.x = ((float)sReg[37]) / 16.4f * (M_PI / 180.0f);
-        ctrl.currentRate.y = ((float)sReg[38]) / 16.4f * (M_PI / 180.0f);
-        ctrl.currentRate.z = ((float)sReg[39]) / 16.4f * (M_PI / 180.0f);
+        ctrl.currentRate.x = ((float)sReg[37]) / 16.4f * ((float)M_PI / 180.0f);
+        ctrl.currentRate.y = ((float)sReg[38]) / 16.4f * ((float)M_PI / 180.0f);
+        ctrl.currentRate.z = ((float)sReg[39]) / 16.4f * ((float)M_PI / 180.0f);
         vTaskDelay(xDelay);
         //todo may be some bug in there
     }

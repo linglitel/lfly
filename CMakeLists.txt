@@ -47,17 +47,13 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-        Core/Src/Sensor/MPU9250/MPU9250Utils.c
         Core/Src/Sensor/SensorUtils.c
-        Core/Src/Sensor/MPU9250/AK8963Utils.c
-        Core/Src/Algorithm/Madgwick/Madgwick.c
         Core/Src/Algorithm/AlgorithmUtils.c
         Core/Src/Tasks/AttitudeTask.c
         Core/Src/Flash/W25Q64/W25Q64Utils.c
         Core/Src/Tasks/PidTask.c
         Core/Src/Tasks/ESCControlTask.c
         Core/Src/Log/LogUtils.c
-        Core/Src/Algorithm/Mahony/Mahony.c
         Core/Src/Sensor/JY901P/SDK/wit_c_sdk.c
         Core/Src/Sensor/JY901P/JY901PUtils.c
         Core/Src/Tasks/RemoteControlTask.c

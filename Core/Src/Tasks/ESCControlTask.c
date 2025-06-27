@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "LogUtils.h"
-#include "Madgwick.h"
 #include "freertos_os2.h"
 #include "stm32f4xx_hal.h"
 #include "task.h"
