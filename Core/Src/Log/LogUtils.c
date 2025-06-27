@@ -6,6 +6,8 @@
 
 #include <string.h>
 
+#include "W25Q64Utils.h"
+
 static uint32_t s_log_start_addr = LOG_START_ADDR;
 static uint32_t s_log_total_size = LOG_TOTAL_SIZE;
 static uint32_t s_log_entry_size = LOG_ENTRY_SIZE;

@@ -3,19 +3,20 @@
 //
 #include "ESCControlTask.h"
 
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "LogUtils.h"
 #include "freertos_os2.h"
+#include "PidTask.h"
 #include "stm32f4xx_hal.h"
 #include "task.h"
 
 extern TIM_HandleTypeDef htim2;
 
 ESCOutput ESC_Output;
+static LogEntry log;
 
 void ESC_Init()
 {
@@ -46,7 +47,6 @@ void ESC_Init()
     LogEntry log;
     log.module_id = ESC_MOUDLE_ID;
     log.type = LOG_TYPE_INFO;
-    log.severity = LOG_SEVERITY_INFO;
     log.timestamp = HAL_GetTick();
     log.error_code = 0;
     snprintf(log.message, sizeof(log.message), "ESC initialized successfully");
@@ -55,15 +55,45 @@ void ESC_Init()
 
 void ESC_Update()
 {
+    float roll = ctrl.controlOutput.x;
+    float pitch = ctrl.controlOutput.y;
+    float yaw = ctrl.controlOutput.z;
+
+    int16_t mix[4];
+    mix[0] = BASE_THROTTLE + (int16_t)(pitch + roll - yaw);
+    mix[1] = BASE_THROTTLE + (int16_t)(pitch - roll + yaw);
+    mix[2] = BASE_THROTTLE + (int16_t)(-pitch + roll + yaw);
+    mix[3] = BASE_THROTTLE + (int16_t)(-pitch - roll - yaw);
+
+    // 限速
+    for (int i = 0; i < 4; i++)
+    {
+        if (mix[i] > ESC_MAX)
+        {
+            log.error_code = 0;
+            log.type = LOG_TYPE_WARNING;
+            log.timestamp = HAL_GetTick();
+            snprintf(log.message, strlen(log.message), "Motor Full Load Speed");
+            mix[i] = ESC_MAX;
+        }
+        else if (mix[i] < ESC_MIN) mix[i] = ESC_MIN;
+    }
+
+    ESC_Output.ESCA = mix[0];
+    ESC_Output.ESCB = mix[1];
+    ESC_Output.ESCC = mix[2];
+    ESC_Output.ESCD = mix[3];
+
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, ESC_Output.ESCA);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, ESC_Output.ESCB);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, ESC_Output.ESCC);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, ESC_Output.ESCD);
 }
 
+
 void ESCControlTask(void* argument)
 {
-    const TickType_t xDelay = pdMS_TO_TICKS(5); // 10ms周期
+    const TickType_t xDelay = pdMS_TO_TICKS(3);
     for (;;)
     {
         ESC_Update();

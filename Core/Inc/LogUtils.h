@@ -25,23 +25,13 @@ typedef enum
 } LogType;
 
 
-typedef enum
-{
-    LOG_SEVERITY_DEBUG = 0, // 调试信息，最低等级
-    LOG_SEVERITY_INFO = 1, // 普通信息
-    LOG_SEVERITY_WARNING = 2, // 警告
-    LOG_SEVERITY_ERROR = 3, // 错误
-    LOG_SEVERITY_CRITICAL = 4, // 严重错误，最高等级
-} LogSeverity;
-
 typedef struct
 {
     uint32_t timestamp; // 4 bytes
     uint8_t type; // 1 byte，日志类型
-    uint8_t severity; // 1 byte，严重等级
     uint8_t module_id; // 1 byte，模块ID
     uint8_t error_code; // 1 byte，错误码
-    char message[56]; // 56 bytes，日志内容
+    char message[57]; // 56 bytes，日志内容
 } LogEntry;
 
 uint8_t LOG_Read(uint32_t index, LogEntry* log_entry);

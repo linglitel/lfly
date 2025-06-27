@@ -8,6 +8,11 @@
 
 #define ESC_MOUDLE_ID 2
 
+#define ESC_MIN  1000
+#define ESC_MAX  2000
+
+#define BASE_THROTTLE 1200
+
 typedef struct
 {
     uint16_t ESCA;

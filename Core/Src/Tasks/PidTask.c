@@ -152,9 +152,6 @@ void AttitudeController_Update(AttitudeController* ctrl)
 
     // 4. 速度环 PID → 输出控制值
     ctrl->controlOutput = PID3Axis_Update(&ctrl->ratePID, ctrl->rateError, ctrl->dt);
-    /*ctrl->controlOutput.x *= -1.0f;
-    ctrl->controlOutput.y *= -1.0f;
-    ctrl->controlOutput.z *= -1.0f;*/
 }
 
 void AttitudeController_Init(AttitudeController* ctrl, float dt)

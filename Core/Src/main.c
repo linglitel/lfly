@@ -27,6 +27,12 @@
 #include <string.h>
 #include "AttitudeTask.h"
 #include "LogUtils.h"
+#include "ESCControlTask.h"
+#include "JY901PUtils.h"
+#include "PidTask.h"
+#include "RemoteControlTask.h"
+#include "W25Q64Utils.h"
+#include "wit_c_sdk.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,38 +42,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MPU9250_ADDR  (0x68 << 1)  // 7-bit 地址左移一位
-#define AK8963_ADDR   (0x0C << 1)  // AK8963 地址
 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#include <math.h>
-#include <stdbool.h>
-
-#include "ESCControlTask.h"
-#include "JY901PUtils.h"
-#include "PidTask.h"
-#include "RemoteControlTask.h"
-#include "wit_c_sdk.h"
-
-
-#define ITM_Port8(n)    (*((volatile unsigned char *)(0xE0000000+4*n)))
-#define ITM_Port16(n)   (*((volatile unsigned short*)(0xE0000000+4*n)))
-#define ITM_Port32(n)   (*((volatile unsigned long *)(0xE0000000+4*n)))
-
-#define DEMCR           (*((volatile unsigned long *)(0xE000EDFC)))
-#define TRCENA          0x01000000
-
-struct __FILE
-{
-    int handle; /* Add whatever you need here */
-};
-
-FILE __stdout;
-FILE __stdin;
-
 
 /* USER CODE END PM */
 
@@ -91,21 +70,15 @@ const osThreadAttr_t defaultTask_attributes = {
     .stack_size = 256 * 4,
     .priority = (osPriority_t)osPriorityNormal,
 };
+/* USER CODE BEGIN PV */
+
+uint8_t usart6_rx_byte = 0;
+
 osThreadId_t imuTaskHandle;
 osThreadId_t pidTaskHandle;
 osThreadId_t escTaskHandle;
 osThreadId_t rcTaskHandle;
-uint8_t usart6_rx_byte;
-/* USER CODE BEGIN PV */
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart)
-{
-    if (huart->Instance == USART6)
-    {
-        WitSerialDataIn(usart6_rx_byte); // 把接收到的数据交给 Wit 解析器
-        HAL_UART_Receive_IT(&huart6, &usart6_rx_byte, 1); // 继续接收下一个字节
-    }
-}
 
 /* USER CODE END PV */
 
@@ -127,13 +100,14 @@ void StartDefaultTask(void* argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int fputc(int ch, FILE* f)
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart)
 {
-    UNUSED(f);
-    HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 0xFFFF);
-    return ch;
+    if (huart->Instance == USART6)
+    {
+        WitSerialDataIn(usart6_rx_byte); // 把接收到的数据交给 Wit 解析器
+        HAL_UART_Receive_IT(&huart6, &usart6_rx_byte, 1); // 继续接收下一个字节
+    }
 }
-
 
 /* USER CODE END 0 */
 
@@ -413,9 +387,9 @@ static void MX_TIM2_Init(void)
 
     /* USER CODE END TIM2_Init 1 */
     htim2.Instance = TIM2;
-    htim2.Init.Prescaler = 249;
+    htim2.Init.Prescaler = 99;
     htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim2.Init.Period = 1999;
+    htim2.Init.Period = 2499;
     htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim2) != HAL_OK)

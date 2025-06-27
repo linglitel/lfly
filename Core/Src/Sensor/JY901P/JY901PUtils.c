@@ -29,7 +29,6 @@ bool JY901P_Init()
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
-        log.severity = LOG_SEVERITY_ERROR;
         log.error_code = ret;
         snprintf(log.message, sizeof(log.message), "WitInit failed");
         LOG_Write(&log);
@@ -41,7 +40,6 @@ bool JY901P_Init()
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
-        log.severity = LOG_SEVERITY_ERROR;
         log.error_code = ret;
         snprintf(log.message, sizeof(log.message), "WitSerialWriteRegister failed");
         LOG_Write(&log);
@@ -53,7 +51,6 @@ bool JY901P_Init()
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
-        log.severity = LOG_SEVERITY_ERROR;
         log.error_code = ret;
         snprintf(log.message, sizeof(log.message), "WitDelayMsRegister failed");
         LOG_Write(&log);
@@ -65,7 +62,6 @@ bool JY901P_Init()
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
-        log.severity = LOG_SEVERITY_ERROR;
         log.error_code = ret;
         snprintf(log.message, sizeof(log.message), "WitRegisterCallBack failed");
         LOG_Write(&log);
@@ -75,7 +71,6 @@ bool JY901P_Init()
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
-        log.severity = LOG_SEVERITY_ERROR;
         log.error_code = ret;
         snprintf(log.message, sizeof(log.message), "WitSetContent failed");
         LOG_Write(&log);
@@ -85,14 +80,12 @@ bool JY901P_Init()
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
-        log.severity = LOG_SEVERITY_ERROR;
         log.error_code = ret;
         snprintf(log.message, sizeof(log.message), "WitSetOutputRate failed");
         LOG_Write(&log);
         return false;
     }
     log.type = LOG_TYPE_INFO;
-    log.severity = LOG_SEVERITY_INFO;
     log.error_code = 0;
     snprintf(log.message, sizeof(log.message), "JY901P init success");
     LOG_Write(&log);
@@ -108,7 +101,6 @@ static void JY901P_USART_SEND(uint8_t* pData, uint16_t len)
         LogEntry log;
         log.module_id = 0;
         log.error_code = ret;
-        log.severity = LOG_SEVERITY_ERROR;
         log.type = LOG_TYPE_ERROR;
         log.timestamp = HAL_GetTick();
         snprintf(log.message, sizeof(log.message), "HAL_UART_Transmit failed");
@@ -122,7 +114,6 @@ static void JY901P_Callback(uint32_t reg, uint32_t len)
     log.type = LOG_TYPE_INFO;
     log.timestamp = HAL_GetTick();
     log.module_id = JY901P_MOUDLE_ID;
-    log.severity = LOG_SEVERITY_INFO;
     log.error_code = 0;
     snprintf(log.message, sizeof(log.message), "Reg %lu updated, len %lu", reg, len);
     LOG_Write(&log);
