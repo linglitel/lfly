@@ -10,7 +10,6 @@
 #include "wit_c_sdk.h"
 
 
-
 extern UART_HandleTypeDef huart6;
 
 static void JY901P_USART_SEND(uint8_t* pData, uint16_t len);
@@ -67,7 +66,7 @@ bool JY901P_Init()
         LOG_Write(&log);
         return false;
     }
-    ret = WitSetContent(RSW_Q);
+    ret = WitSetContent(RSW_Q | RSW_GYRO);
     if (ret != WIT_HAL_OK)
     {
         log.type = LOG_TYPE_ERROR;
@@ -110,12 +109,4 @@ static void JY901P_USART_SEND(uint8_t* pData, uint16_t len)
 
 static void JY901P_Callback(uint32_t reg, uint32_t len)
 {
-    LogEntry log;
-    log.type = LOG_TYPE_INFO;
-    log.timestamp = HAL_GetTick();
-    log.module_id = JY901P_MOUDLE_ID;
-    log.error_code = 0;
-    snprintf(log.message, sizeof(log.message), "Reg %lu updated, len %lu", reg, len);
-    LOG_Write(&log);
 }
-

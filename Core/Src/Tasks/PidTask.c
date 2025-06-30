@@ -168,10 +168,10 @@ void AttitudeController_Init(AttitudeController* ctrl, float dt)
     ctrl->currentRate = (Vector3){0.0f, 0.0f, 0.0f};
 
     // 姿态 PID 参数（控制角度响应）
-    PID3Axis_Init(&ctrl->attitudePID, 4.0f, 0.0f, 0.0f, 10.0f, 100.0f);
+    PID3Axis_Init(&ctrl->attitudePID, 2.0f, 0.0f, 0.0f, 10.0f, 100.0f);
 
     // 角速度 PID 参数（控制角速度）
-    PID3Axis_Init(&ctrl->ratePID, 0.5f, 0.05f, 0.01f, 5.0f, 100.0f);
+    PID3Axis_Init(&ctrl->ratePID, 0.5f, 0.05f, 0.00f, 5.0f, 100.0f);
 }
 
 

@@ -14,6 +14,7 @@
 #include "task.h"
 
 extern TIM_HandleTypeDef htim2;
+extern UART_HandleTypeDef huart1;
 
 ESCOutput ESC_Output;
 static LogEntry log;
@@ -58,12 +59,17 @@ void ESC_Update()
     float roll = ctrl.controlOutput.x;
     float pitch = ctrl.controlOutput.y;
     float yaw = ctrl.controlOutput.z;
+    float scale = 500.0f;
+    /*char buf[50];
+    snprintf(buf, sizeof(buf), "%f,%f,%f", pitch, roll, yaw);
+    HAL_UART_Transmit(&huart1,
+                      buf, strlen(buf), 100);*/
 
     int16_t mix[4];
-    mix[0] = BASE_THROTTLE + (int16_t)(pitch + roll - yaw);
-    mix[1] = BASE_THROTTLE + (int16_t)(pitch - roll + yaw);
-    mix[2] = BASE_THROTTLE + (int16_t)(-pitch + roll + yaw);
-    mix[3] = BASE_THROTTLE + (int16_t)(-pitch - roll - yaw);
+    mix[0] = BASE_THROTTLE + (int16_t)((pitch + roll - yaw) * scale);
+    mix[1] = BASE_THROTTLE + (int16_t)((pitch - roll + yaw) * scale);
+    mix[2] = BASE_THROTTLE + (int16_t)((-pitch + roll + yaw) * scale);
+    mix[3] = BASE_THROTTLE + (int16_t)((-pitch - roll - yaw) * scale);
 
     // 限速
     for (int i = 0; i < 4; i++)
